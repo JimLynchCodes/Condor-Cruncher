@@ -11,6 +11,7 @@ import { interval } from 'rxjs';
 import { decideLimitPrice } from 'src/app/services/limit-price-decider';
 import { decideBuyOrSell } from 'src/app/services/buy-or-sell-decider';
 import { StrangulatorService } from 'src/app/strangulator.service';
+import { CondorCruncher } from 'src/app/condor-cruncher.service';
 
 const fakeBuyOrder1 = {
   quantity: 1,
@@ -105,27 +106,31 @@ const fakeSellOrder1 = {
 export class TradeBotPageComponent {
 
   accountNumber: string;
-  
+
   accountsData: any;
 
   // largecapTickers = ['TSM', 'TSLA', 'BABA', 'WMT', 'DIS', 'BAC', 'NVDA', 'PYPL', 'INTC', 'NFLX', 'NKE', 'QCOM', 'UPS', 'BA', 'JD']
   largecapTickers = []
   // etfTickers = ['IWM', 'QQQ', 'EEM', 'EWZ', 'IWM', 'XLF', 'SQQQ', 'SLV', 'GDX', 'XLE', 'SHY', 'VOO', 'VTI']
   etfTickers = []
-  memeStonkTickers = ['GME', 'AMC', 'MVIS', 'VIAC', 'RKT', 'AMD', 'MSFT', 'PLTR', 'TLRY', 'NIO', 'UBER', 'APHA', 'EBAY', 'TSLA']
-  bestInClassTickers = ['GOOG', 'AAPL', 'AMZN', 'HD', 'WMT', 'MA', 'V', 'NKE', 'GOOGL', 'ATBI', 'VZ' ]
-  highIvs = ['SIVB', 'SJR', 'CHTR', 'COST', 'HD', 'WMT', 'V', 'ADBE', 'NKE', 'GOOGL', 'TROW', 'KMX', 'D', 'FDX', 'MRNA', 'GSK', 'VALE', 'EL', 'SHW' ]
+  // memeStonkTickers = ['GME', 'AMC', 'MVIS', 'VIAC', 'RKT', 'AMD', 'MSFT', 'PLTR', 'TLRY', 'NIO', 'UBER', 'APHA', 'EBAY', 'TSLA']
+  memeStonkTickers = []
+  // bestInClassTickers = ['GOOG', 'AAPL', 'AMZN', 'HD', 'WMT', 'MA', 'V', 'NKE', 'GOOGL', 'ATBI', 'VZ' ]
+  bestInClassTickers = []
+  // highIvs = ['SIVB', 'SJR', 'CHTR', 'COST', 'HD', 'WMT', 'V', 'ADBE', 'NKE', 'GOOGL', 'TROW', 'KMX', 'D', 'FDX', 'MRNA', 'GSK', 'VALE', 'EL', 'SHW' ]
+  highIvs = ['TSLA']
 
-  rowsInTickerTable = 0
-  arrayOfRowIndicies = []
+  rowsInTickerTable = 0;
+  arrayOfRowIndicies = [];
 
-  allSymbols = []
+  allSymbols = [];
 
   strangulations = [];
+  shortCrunchedCondors = [];
 
   constructor(private http: HttpClient,
     private tdApiSvc: TdApiService,
-    private strangulator: StrangulatorService,
+    private condorCruncher: CondorCruncher,
   ) { }
 
   access_token = ''
@@ -160,34 +165,45 @@ export class TradeBotPageComponent {
 
         const optionChain = await this.tdApiSvc.getOptionChainForSymbol(symbol);
 
-        const minAcceptableDelta = -0.05
-        const maxAcceptableDelta = 0.04
+        // const minAcceptableDelta = -0.05
+        // const maxAcceptableDelta = 0.04
 
-        const minAcceptableGamma = -0.05
-        const maxAcceptableGamma = 0.05
+        // const minAcceptableGamma = -0.05
+        // const maxAcceptableGamma = 0.05
 
         console.log('chainnnn: ', optionChain)
-        console.log(optionChain)
+        // console.log(optionChain)
 
         if (optionChain['underlying']) {
-          const strangulation = this.strangulator.strangulate(
+          //   const strangulation = this.strangulator.strangulate(
+          //     optionChain['callExpDateMap'],
+          //     optionChain['putExpDateMap'],
+          //     optionChain['underlying']['last'],
+          //     minAcceptableDelta, 
+          //     maxAcceptableDelta,
+          //     minAcceptableGamma,
+          //     maxAcceptableGamma
+          //   )
+
+          const shortCondorsForSymbol = this.condorCruncher.crunchShortCondorsForSymbol(
+            optionChain['symbol'],
             optionChain['callExpDateMap'],
             optionChain['putExpDateMap'],
-            optionChain['underlying']['last'],
-            minAcceptableDelta, 
-            maxAcceptableDelta,
-            minAcceptableGamma,
-            maxAcceptableGamma
+            optionChain['underlying']['last']
+            // minAcceptableDelta,
+            // maxAcceptableDelta,
+            // minAcceptableGamma,
+            // maxAcceptableGamma
           )
-          this.strangulations.push(strangulation);
 
-          this.strangulations = this.strangulations.filter(strangulation => {
-            return strangulation.length > 0
+          this.shortCrunchedCondors.push(shortCondorsForSymbol);
+
+          this.shortCrunchedCondors = this.shortCrunchedCondors.filter(crunchedCondors => {
+            return crunchedCondors.length > 0;
           })
 
-          this.strangulations = this.strangulations.sort((a, b) => {
-            return a[0].thetaPower > b[0].thetaPower ? 1 : -1
-            // return a[0].netTheta > b[0].netTheta ? 1 : -1
+          this.shortCrunchedCondors = this.shortCrunchedCondors.sort((a, b) => {
+            return a[0].bp2f > b[0].bf2f ? 1 : -1;
           })
 
           // console.log('the gud ones are..... ', this.strangulations);
